@@ -70,7 +70,7 @@ const Email = () => {
       setIsSending(true);
       try {
         const token = localStorage.getItem('token');
-        await axios.post('http://localhost:8080/api/email/send', {
+        await axios.post('https://taskpilot-backend-n09v.onrender.com/api/email/send', {
           to: email.to,
           subject: email.subject,
           body: email.body
@@ -98,7 +98,7 @@ const Email = () => {
       setIsSending(true);
       try {
         const token = localStorage.getItem('token');
-        await axios.post('http://localhost:8080/api/email/send', {
+        await axios.post('https://taskpilot-backend-n09v.onrender.com/api/email/send', {
           to: composeData.to,
           subject: composeData.subject,
           body: composeData.body

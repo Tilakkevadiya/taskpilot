@@ -12,7 +12,7 @@ const Tasks = () => {
 
   const fetchTasks = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/tasks')
+      const response = await axios.get('https://taskpilot-backend-n09v.onrender.com/api/tasks')
       setTasks(response.data.data.map(task => ({
         ...task,
         completed: task.status === 'COMPLETED'
@@ -50,7 +50,7 @@ const Tasks = () => {
     ))
 
     try {
-      await axios.put(`http://localhost:8080/api/tasks/${id}/status`, { status: newStatus })
+      await axios.put(`https://taskpilot-backend-n09v.onrender.com/api/tasks/${id}/status`, { status: newStatus })
     } catch (error) {
       console.error('Failed to update task status:', error)
       // Revert optimistic update
@@ -61,7 +61,7 @@ const Tasks = () => {
   const addTask = async () => {
     if (newTask.title.trim()) {
       try {
-        const response = await axios.post('http://localhost:8080/api/tasks', {
+        const response = await axios.post('https://taskpilot-backend-n09v.onrender.com/api/tasks', {
           ...newTask,
           status: 'PENDING'
         })
@@ -86,7 +86,7 @@ const Tasks = () => {
     setTasks(tasks.filter(task => task.id !== id))
 
     try {
-      await axios.delete(`http://localhost:8080/api/tasks/${id}`)
+      await axios.delete(`https://taskpilot-backend-n09v.onrender.com/api/tasks/${id}`)
     } catch (error) {
       console.error('Failed to delete task:', error)
       // Revert optimistic update

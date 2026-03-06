@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = 'https://taskpilot-backend-n09v.onrender.com/api';
 
 export const parseVoiceCommand = async (command) => {
   try {

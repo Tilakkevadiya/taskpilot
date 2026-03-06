@@ -70,7 +70,7 @@ const Premium = ({ isOpen, onClose }) => {
 
     try {
       // 1. Create Subscription on Backend
-      const res = await axios.post('http://localhost:8080/api/payment/create-subscription')
+      const res = await axios.post('https://taskpilot-backend-n09v.onrender.com/api/payment/create-subscription')
       const { subscriptionId } = res.data
 
       // 2. Open Razorpay Checkout Modal
@@ -82,7 +82,7 @@ const Premium = ({ isOpen, onClose }) => {
         handler: async function (response) {
           try {
             // 3. Verify Payment Signature
-            const verifyRes = await axios.post('http://localhost:8080/api/payment/verify-payment', {
+            const verifyRes = await axios.post('https://taskpilot-backend-n09v.onrender.com/api/payment/verify-payment', {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature: response.razorpay_signature

@@ -19,8 +19,8 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [tasksRes, meetingsRes] = await Promise.all([
-          axios.get('http://localhost:8080/api/tasks'),
-          axios.get('http://localhost:8080/api/meetings')
+          axios.get('https://taskpilot-backend-n09v.onrender.com/api/tasks'),
+          axios.get('https://taskpilot-backend-n09v.onrender.com/api/meetings')
         ])
 
         const tasks = tasksRes.data.data

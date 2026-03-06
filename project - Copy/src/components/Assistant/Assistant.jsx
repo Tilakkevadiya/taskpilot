@@ -486,7 +486,7 @@ const Assistant = () => {
   const handleDirectTask = () => {
     const taskTitle = prompt('Enter task title:')
     if (taskTitle && taskTitle.trim()) {
-      axios.post('http://localhost:8080/api/tasks', {
+      axios.post('https://taskpilot-backend-n09v.onrender.com/api/tasks', {
         title: taskTitle.trim(),
         priority: 'medium',
         status: 'PENDING'

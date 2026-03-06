@@ -39,7 +39,7 @@ const Register = ({ onLogin }) => {
 
         setIsLoading(true)
         try {
-            await axios.post('http://localhost:8080/api/auth/register', {
+            await axios.post('https://taskpilot-backend-n09v.onrender.com/api/auth/register', {
                 username, email, password, profession
             })
             setSuccessMsg("Registration successful! You can now log in.")
@@ -59,7 +59,7 @@ const Register = ({ onLogin }) => {
         resetForm()
         setIsLoading(true)
         try {
-            const response = await axios.post('http://localhost:8080/api/auth/google', {
+            const response = await axios.post('https://taskpilot-backend-n09v.onrender.com/api/auth/google', {
                 idToken: credentialResponse.credential
             })
             completeLogin(response.data.token, response.data.user)

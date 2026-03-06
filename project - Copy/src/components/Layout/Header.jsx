@@ -23,7 +23,7 @@ const Header = ({ onPremiumClick, userData, onLogout }) => {
   useEffect(() => {
     const fetchUsage = async () => {
       try {
-        const res = await axios.get('http://localhost:8080/api/usage/current')
+        const res = await axios.get('https://taskpilot-backend-n09v.onrender.com/api/usage/current')
         setUsage(res.data)
         const isPrem = res.data.plan === 'PREMIUM'
         setPremiumStatus({ isPremium: isPrem })
