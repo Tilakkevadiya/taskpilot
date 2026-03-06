@@ -1,0 +1,48 @@
+# ----------------------------------------------------------------------
+# Root Level
+# ----------------------------------------------------------------------
+.vscode/
+
+# ----------------------------------------------------------------------
+# React Frontend (project - Copy)
+# ----------------------------------------------------------------------
+project - Copy/node_modules/
+project - Copy/dist/
+project - Copy/build/
+project - Copy/.env
+project - Copy/.env.local
+project - Copy/.DS_Store
+project - Copy/npm-debug.log*
+project - Copy/yarn-debug.log*
+project - Copy/yarn-error.log*
+
+# ----------------------------------------------------------------------
+# Spring Boot Backend (taskpilot-backend)
+# ----------------------------------------------------------------------
+taskpilot-backend/target/
+taskpilot-backend/bin/
+taskpilot-backend/.classpath
+taskpilot-backend/.project
+taskpilot-backend/.settings/
+taskpilot-backend/.mvn/wrapper/maven-wrapper.jar
+taskpilot-backend/logs/
+
+# Optional depending on how you build
+taskpilot-backend/.idea/
+taskpilot-backend/*.iml
+
+# ----------------------------------------------------------------------
+# Python AI Service (taskpilot-ai-service)
+# ----------------------------------------------------------------------
+taskpilot-ai-service/__pycache__/
+taskpilot-ai-service/*.py[cod]
+taskpilot-ai-service/*$py.class
+taskpilot-ai-service/.pytest_cache/
+taskpilot-ai-service/venv/
+taskpilot-ai-service/env/
+taskpilot-ai-service/.venv/
+taskpilot-ai-service/.env
+
+# General
+.DS_Store
+*.log

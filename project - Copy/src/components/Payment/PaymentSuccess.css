@@ -1,0 +1,125 @@
+.payment-success-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.success-content {
+  background: white;
+  border-radius: 16px;
+  padding: 48px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.success-icon {
+  margin-bottom: 24px;
+}
+
+.check-icon {
+  color: #10b981;
+}
+
+.success-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.crown-icon {
+  color: #f59e0b;
+}
+
+.success-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.success-message {
+  font-size: 18px;
+  color: #6b7280;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.premium-features-list {
+  text-align: left;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.premium-features-list h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.premium-features-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.premium-features-list li {
+  padding: 8px 0;
+  color: #374151;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.success-actions {
+  margin-bottom: 24px;
+}
+
+.dashboard-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+}
+
+.dashboard-btn:hover {
+  background: #2563eb;
+}
+
+.auto-redirect {
+  font-size: 14px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .success-content {
+    padding: 32px 24px;
+  }
+  
+  .success-header h1 {
+    font-size: 24px;
+  }
+  
+  .success-message {
+    font-size: 16px;
+  }
+}

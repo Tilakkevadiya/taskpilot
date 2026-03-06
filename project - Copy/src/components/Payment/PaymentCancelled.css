@@ -1,0 +1,158 @@
+.payment-cancelled-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.cancelled-content {
+  background: white;
+  border-radius: 16px;
+  padding: 48px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.cancelled-icon {
+  margin-bottom: 24px;
+}
+
+.x-icon {
+  color: #ef4444;
+}
+
+.cancelled-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.crown-icon {
+  color: #f59e0b;
+}
+
+.cancelled-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.cancelled-message {
+  font-size: 18px;
+  color: #6b7280;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.cancellation-info {
+  text-align: left;
+  background: #fef2f2;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.cancellation-info h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cancellation-info p {
+  margin: 0 0 16px 0;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cancellation-info ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cancellation-info li {
+  padding: 4px 0;
+  color: #374151;
+  font-size: 14px;
+}
+
+.cancelled-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+
+.try-again-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.try-again-btn:hover {
+  background: #2563eb;
+}
+
+.dashboard-btn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dashboard-btn:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.auto-redirect {
+  font-size: 14px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .cancelled-content {
+    padding: 32px 24px;
+  }
+  
+  .cancelled-header h1 {
+    font-size: 24px;
+  }
+  
+  .cancelled-message {
+    font-size: 16px;
+  }
+  
+  .cancelled-actions {
+    flex-direction: column;
+  }
+  
+  .try-again-btn,
+  .dashboard-btn {
+    width: 100%;
+  }
+}

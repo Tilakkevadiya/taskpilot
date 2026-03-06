@@ -1,0 +1,26 @@
+{
+  "name": "task-pilot-ai",
+  "version": "1.0.0",
+  "description": "Task Pilot AI - React GUI for Office Automation",
+  "private": true,
+  "dependencies": {
+    "@react-oauth/google": "^0.13.4",
+    "@stripe/stripe-js": "^8.7.0",
+    "axios": "^1.13.6",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "stripe": "^20.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
