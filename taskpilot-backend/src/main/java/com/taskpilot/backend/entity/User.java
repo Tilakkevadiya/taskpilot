@@ -2,6 +2,7 @@ package com.taskpilot.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -29,25 +30,35 @@ public class User {
                                            // subscriptionPlan
 
     @Enumerated(EnumType.STRING)
-    private SubscriptionPlan subscriptionPlan = SubscriptionPlan.FREE;
+    private PlanType planType = PlanType.FREE;
 
     private LocalDateTime subscriptionStartDate;
     private LocalDateTime subscriptionEndDate;
 
     @Enumerated(EnumType.STRING)
-    private SubscriptionStatus subscriptionStatus = SubscriptionStatus.ACTIVE;
+    private SubscriptionStatus subscriptionStatus = SubscriptionStatus.NONE;
 
     private String razorpayCustomerId;
     private String razorpaySubscriptionId;
 
+    private String googleAccessToken;
+    private String googleRefreshToken;
+    private LocalDateTime googleTokenExpiry;
+
+    // Weekly usage tracking (resets every 7 days)
+    private int tasksCreatedThisWeek = 0;
+    private int meetingsCreatedThisWeek = 0;
+    private int emailsSentThisWeek = 0;
+    private LocalDate lastUsageResetDate;
+
     @Column(updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public enum SubscriptionPlan {
+    public enum PlanType {
         FREE, PREMIUM
     }
 
     public enum SubscriptionStatus {
-        ACTIVE, EXPIRED, CANCELLED
+        ACTIVE, EXPIRED, CANCELLED, NONE
     }
 }

@@ -1,167 +1,206 @@
-.page-header {
-  margin-bottom: 1.5rem;
+:root {
+  --dashboard-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
 
+.content-area {
+  padding: 2rem;
+  min-height: 100vh;
+}
+
+/* ─── Greeting Section ───────────────────────────────────────────────────── */
+.greeting-section {
+  background: var(--dashboard-gradient);
+  border-radius: 20px;
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.greeting-section::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 300px;
+  height: 300px;
+  background: rgba(255, 255, 255, 0.1);
+  filter: blur(50px);
+  border-radius: 50%;
+}
+
+.greeting-text h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  color: white;
+  letter-spacing: -0.02em;
+}
+
+.greeting-text p {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* ─── Quick Actions ──────────────────────────────────────────────────────── */
+.quick-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  background: var(--accent-gradient);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.95rem;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+  filter: brightness(1.1);
+}
+
+/* ─── Stats Grid ────────────────────────────────────────────────────────── */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
 }
 
 .stat-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
+  /* Uses .glass-card and .glass-card-hover from index.css */
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  transition: all 0.2s;
-}
-
-.stat-card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 4px 12px var(--shadow);
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  cursor: pointer;
 }
 
 .stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 0.5rem;
-  background: var(--primary-bg);
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(99, 102, 241, 0.1);
   color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
 .stat-content h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 0.1rem;
 }
 
 .stat-content p {
-  font-size: 0.875rem;
-  color: var(--text-muted);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .stat-content span {
   font-size: 0.75rem;
   color: var(--text-muted);
+  margin-top: 0.35rem;
+  display: block;
 }
 
-.dashboard-grid {
+/* ─── Feature Navigation Cards ───────────────────────────────────────────── */
+.feature-nav-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
-.dashboard-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-}
-
-.dashboard-card h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-}
-
-.activity-list {
+.feature-nav-card {
+  /* Uses .glass-card and .glass-card-hover from index.css */
+  padding: 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.25rem;
+  position: relative;
+  overflow: hidden;
 }
 
-.activity-item {
+.feature-nav-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), transparent);
+  border-radius: 0 0 0 100%;
+}
+
+.feature-header {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border-radius: 0.5rem;
+  align-items: center;
+  gap: 1.25rem;
 }
 
-.activity-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 0.5rem;
-  background: var(--primary-bg);
+.feature-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.1);
   color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
-.activity-content p {
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  margin-bottom: 0.2rem;
+.feature-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: white;
 }
 
-.activity-action {
-  font-weight: 600;
-  color: var(--primary);
+.feature-nav-card p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
-.activity-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.meetings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.meeting-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border-radius: 0.5rem;
-}
-
-.meeting-time {
+.feature-footer {
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  background: var(--primary-bg);
-  border-radius: 0.5rem;
   color: var(--primary);
-  font-size: 0.8rem;
-  font-weight: 500;
-  min-width: 85px;
-}
-
-.meeting-content h3 {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 0.2rem;
-}
-
-.meeting-content p {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 @media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
+  .content-area {
+    padding: 1.5rem;
   }
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+  .greeting-section {
+    padding: 1.75rem;
+  }
+  .greeting-text h1 {
+    font-size: 1.85rem;
   }
 }

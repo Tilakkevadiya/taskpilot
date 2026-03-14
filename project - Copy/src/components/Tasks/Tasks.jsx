@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, Filter, CheckCircle2, Circle, Trash2, Edit2 } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Trash2, Edit2, Loader } from 'lucide-react'
 import axios from 'axios'
+import { useUsage } from '../../context/UsageContext'
 import './Tasks.css'
+import { toast } from 'react-hot-toast'
 
 const Tasks = () => {
-  // Load tasks from localStorage on mount and sync with it
+  const { fetchUsage } = useUsage()
   const [tasks, setTasks] = useState([])
   const [showAddTask, setShowAddTask] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '' })
+  const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '', dueTime: '', reminderMinutesBefore: null })
+  const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingTaskId, setEditingTaskId] = useState(null)
 
   const fetchTasks = async () => {
     try {
-      const response = await axios.get('https://taskpilot-backend-n09v.onrender.com/api/tasks')
+      const token = localStorage.getItem('token')
+      const response = await axios.get('http://localhost:8080/api/tasks', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       setTasks(response.data.data.map(task => ({
         ...task,
         completed: task.status === 'COMPLETED'
@@ -22,7 +31,6 @@ const Tasks = () => {
     }
   }
 
-  // Load tasks from backend on mount
   useEffect(() => {
     fetchTasks()
   }, [])
@@ -30,12 +38,8 @@ const Tasks = () => {
   // Listen for new tasks created by Assistant
   useEffect(() => {
     const handleTaskCreated = () => fetchTasks()
-
     window.addEventListener('taskCreated', handleTaskCreated)
-
-    return () => {
-      window.removeEventListener('taskCreated', handleTaskCreated)
-    }
+    return () => window.removeEventListener('taskCreated', handleTaskCreated)
   }, [])
 
   const toggleTask = async (id) => {
@@ -50,46 +54,106 @@ const Tasks = () => {
     ))
 
     try {
-      await axios.put(`https://taskpilot-backend-n09v.onrender.com/api/tasks/${id}/status`, { status: newStatus })
+      const token = localStorage.getItem('token')
+      await axios.put(`http://localhost:8080/api/tasks/${id}/status`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.success(newStatus === 'COMPLETED' ? "Task completed! 🎉" : "Task marked as pending")
     } catch (error) {
       console.error('Failed to update task status:', error)
-      // Revert optimistic update
+      toast.error("Failed to update status")
       fetchTasks()
     }
   }
 
+  const validateTask = () => {
+    const newErrors = {}
+    const today = new Date().toISOString().split("T")[0]
+    const now = new Date()
+
+    if (!newTask.title.trim()) newErrors.title = 'Task title is required'
+    if (!newTask.dueDate) newErrors.dueDate = 'Due date is required'
+    else if (newTask.dueDate < today) newErrors.dueDate = 'Date cannot be in the past'
+
+    if (newTask.dueTime && newTask.dueDate === today) {
+      const selectedTime = new Date(`${newTask.dueDate}T${newTask.dueTime}`)
+      if (selectedTime < now) newErrors.dueTime = 'Time must be in the future'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const addTask = async () => {
-    if (newTask.title.trim()) {
-      try {
-        const response = await axios.post('https://taskpilot-backend-n09v.onrender.com/api/tasks', {
-          ...newTask,
-          status: 'PENDING'
-        })
-        const createdTask = { ...response.data.data, completed: false }
-        setTasks([...tasks, createdTask])
-        setNewTask({ title: '', priority: 'medium', dueDate: '' })
-        setShowAddTask(false)
-      } catch (error) {
-        if (error.response?.status === 403 && error.response?.data?.upgradeRequired) {
-          alert('You have reached your free daily limit for tasks. Please upgrade to Premium to create more tasks.')
-        } else {
-          console.error('Failed to create task:', error)
-          alert('Failed to create task. Please try again.')
-        }
+    if (!validateTask()) return
+    setIsLoading(true)
+
+    try {
+      const payload = {
+        ...newTask,
+        status: isEditing ? tasks.find(t => t.id === editingTaskId)?.status || 'PENDING' : 'PENDING',
+        dueTime: newTask.dueDate && newTask.dueTime ? new Date(`${newTask.dueDate}T${newTask.dueTime}`).toISOString() : null
       }
+      const token = localStorage.getItem('token')
+      
+      let response;
+      if (isEditing) {
+        response = await axios.put(`http://localhost:8080/api/tasks/${editingTaskId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        toast.success('Task updated successfully! ✨')
+      } else {
+        response = await axios.post('http://localhost:8080/api/tasks', payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        toast.success('Task created successfully! 🚀')
+      }
+      
+      setNewTask({ title: '', priority: 'medium', dueDate: '', dueTime: '', reminderMinutesBefore: null })
+      setShowAddTask(false)
+      setIsEditing(false)
+      setEditingTaskId(null)
+      fetchTasks() 
+      await fetchUsage()
+    } catch (error) {
+      const msg = error.response?.data?.error || error.response?.data?.message || 'Failed to process task';
+      toast.error(msg)
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  const startEdit = (task) => {
+    const dueDate = task.dueTime ? new Date(task.dueTime).toISOString().split('T')[0] : ''
+    const dueTime = task.dueTime ? new Date(task.dueTime).toTimeString().split(' ')[0].substring(0, 5) : ''
+    
+    setNewTask({
+      title: task.title,
+      priority: task.priority.toLowerCase(),
+      dueDate,
+      dueTime,
+      reminderMinutesBefore: task.reminderMinutesBefore
+    })
+    setEditingTaskId(task.id)
+    setIsEditing(true)
+    setShowAddTask(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const deleteTask = async (id) => {
-    // Optimistic UI update
     const previousTasks = [...tasks]
     setTasks(tasks.filter(task => task.id !== id))
 
     try {
-      await axios.delete(`https://taskpilot-backend-n09v.onrender.com/api/tasks/${id}`)
+      const token = localStorage.getItem('token')
+      await axios.delete(`http://localhost:8080/api/tasks/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.success("Task deleted")
+      fetchUsage()
     } catch (error) {
       console.error('Failed to delete task:', error)
-      // Revert optimistic update
+      toast.error("Failed to delete task")
       setTasks(previousTasks)
     }
   }
@@ -114,16 +178,17 @@ const Tasks = () => {
       </div>
 
       {showAddTask && (
-        <div className="add-task-card card">
-          <h3>Create New Task</h3>
+        <div className="add-task-card glass-card">
+          <h3>{isEditing ? 'Edit Task' : 'Create New Task'}</h3>
           <div className="form-group">
             <input
               type="text"
               placeholder="Task title..."
               value={newTask.title}
               onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              className="input"
+              className={`input ${errors.title ? 'input-error' : ''}`}
             />
+            {errors.title && <span className="error-text">{errors.title}</span>}
           </div>
           <div className="form-row">
             <div className="form-group">
@@ -138,32 +203,58 @@ const Tasks = () => {
                 <option value="high">High</option>
               </select>
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Due Date</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  className={`input ${errors.dueDate ? 'input-error' : ''}`}
+                />
+                {errors.dueDate && <span className="error-text">{errors.dueDate}</span>}
+              </div>
+              <div className="form-group">
+                <label>Due Time</label>
+                <input
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
+                  className={`input ${errors.dueTime ? 'input-error' : ''}`}
+                />
+                {errors.dueTime && <span className="error-text">{errors.dueTime}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="form-row">
             <div className="form-group">
-              <label>Due Date</label>
-              <input
-                type="date"
-                value={newTask.dueDate}
-                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+              <label>Reminder</label>
+              <select
+                value={newTask.reminderMinutesBefore || ''}
+                onChange={(e) => setNewTask({ ...newTask, reminderMinutesBefore: e.target.value ? parseInt(e.target.value) : null })}
                 className="input"
-              />
+              >
+                <option value="">No reminder</option>
+                <option value="10">10 minutes before</option>
+                <option value="30">30 minutes before</option>
+                <option value="60">1 hour before</option>
+              </select>
             </div>
           </div>
           <div className="form-actions">
             <button className="btn btn-secondary" onClick={() => setShowAddTask(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={addTask}>
-              Add Task
+            <button className="btn btn-primary" onClick={addTask} disabled={isLoading}>
+              {isLoading ? <Loader className="spinner" size={18} /> : null}
+              {isLoading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Task' : 'Add Task')}
             </button>
           </div>
         </div>
       )}
 
       <div className="tasks-toolbar">
-        <div className="search-box">
-          <Search size={18} />
-          <input type="text" placeholder="Search tasks..." className="search-input" />
-        </div>
         <div className="filter-buttons">
           <button
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
@@ -186,7 +277,7 @@ const Tasks = () => {
         </div>
       </div>
 
-      <div className="tasks-list">
+      <div className="tasks-list glass-card">
         {filteredTasks.map(task => (
           <div key={task.id} className={`task-item ${task.completed ? 'completed' : ''}`}>
             <button
@@ -205,15 +296,19 @@ const Tasks = () => {
                 <span className={`priority-badge ${task.priority}`}>
                   {task.priority}
                 </span>
-                {task.dueDate && (
+                {task.dueTime && (
                   <span className="due-date">
-                    Due: {new Date(task.dueDate).toLocaleDateString()}
+                    Due: {new Date(task.dueTime).toLocaleString()}
                   </span>
                 )}
               </div>
             </div>
             <div className="task-actions">
-              <button className="icon-btn" title="Edit">
+              <button 
+                className="icon-btn" 
+                title="Edit"
+                onClick={() => startEdit(task)}
+              >
                 <Edit2 size={18} />
               </button>
               <button className="icon-btn" onClick={() => deleteTask(task.id)} title="Delete">
@@ -235,7 +330,3 @@ const Tasks = () => {
 }
 
 export default Tasks
-
-
-
-

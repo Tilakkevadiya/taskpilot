@@ -2,7 +2,7 @@ package com.taskpilot.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDate;
+import java.time.Instant;
 
 @Data
 @Entity
@@ -25,5 +25,7 @@ public class Task {
 
     private String status = "PENDING"; // e.g., "PENDING", "COMPLETED"
 
-    private LocalDate dueDate;
+    private Instant dueTime;
+    private Integer reminderMinutesBefore;
+    private boolean reminderSent = false;
 }

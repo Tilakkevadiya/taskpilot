@@ -5,7 +5,7 @@ import com.taskpilot.backend.entity.Meeting;
 import com.taskpilot.backend.service.MeetingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,18 +19,22 @@ public class MeetingController {
     private MeetingService meetingService;
 
     @GetMapping
-    public ResponseEntity<FeatureResponse<List<Meeting>>> getMeetings(Authentication auth) {
-        return ResponseEntity.ok(meetingService.getUserMeetings(auth.getName()));
+    public ResponseEntity<FeatureResponse<List<Meeting>>> getMeetings() {
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseEntity.ok(meetingService.getUserMeetings(email));
     }
 
     @PostMapping
-    public ResponseEntity<FeatureResponse<Meeting>> createMeeting(@RequestBody Meeting meeting, Authentication auth) {
-        return ResponseEntity.ok(meetingService.createMeeting(meeting, auth.getName()));
+    public ResponseEntity<FeatureResponse<Meeting>> createMeeting(@RequestBody Meeting meeting) {
+        System.out.println("Incoming meeting payload: " + meeting);
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseEntity.ok(meetingService.createMeeting(meeting, email));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMeeting(@PathVariable Long id, Authentication auth) {
-        meetingService.deleteMeeting(id, auth.getName());
+    public ResponseEntity<Void> deleteMeeting(@PathVariable Long id) {
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        meetingService.deleteMeeting(id, email);
         return ResponseEntity.noContent().build();
     }
 }

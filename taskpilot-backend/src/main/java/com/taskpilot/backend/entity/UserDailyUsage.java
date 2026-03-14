@@ -22,8 +22,7 @@ public class UserDailyUsage {
     private LocalDate usageDate;
 
     // Daily counters
-    private int emailsSentCount = 0;
-    private int voiceCommandsCount = 0;
-    private int meetingsScheduledCount = 0;
-    private int tasksCreatedCount = 0;
+    private int emailsUsed = 0;
+    private int meetingsUsed = 0;
+    private int tasksUsed = 0;
 }

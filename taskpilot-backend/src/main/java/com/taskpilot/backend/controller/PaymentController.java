@@ -4,9 +4,9 @@ import com.taskpilot.backend.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -16,54 +16,119 @@ public class PaymentController {
 
     @Autowired
     private PaymentService paymentService;
+ 
+    @Autowired
+    private com.taskpilot.backend.service.AuthService authService;
 
-    @PostMapping("/create-subscription")
-    public ResponseEntity<Map<String, String>> createSubscription(Authentication auth) {
-        String email = auth.getName();
-        String subscriptionId = paymentService.createSubscription(email);
+    // ─── 1. Create Order ──────────────────────────────────────────────────────
 
-        Map<String, String> response = new HashMap<>();
-        response.put("subscriptionId", subscriptionId);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/verify-payment")
-    public ResponseEntity<Map<String, String>> verifyPayment(@RequestBody Map<String, String> payload,
-            Authentication auth) {
-        String razorpayPaymentId = payload.get("razorpay_payment_id");
-        String razorpaySubscriptionId = payload.get("razorpay_subscription_id");
-        String razorpaySignature = payload.get("razorpay_signature");
-
-        boolean isValid = paymentService.verifyPaymentSignature(razorpaySubscriptionId, razorpayPaymentId,
-                razorpaySignature);
-
-        if (isValid) {
-            String customerId = "cust_dummy"; // You can optionally fetch actual customer ID from webhook or API
-            paymentService.upgradeUserToPremium(auth.getName(), customerId, razorpaySubscriptionId);
-
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Upgraded to PREMIUM successfully.");
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid signature."));
+    /**
+     * Authenticated endpoint.
+     * Creates a Razorpay order for the currently logged-in user.
+     * Returns { orderId, amount, currency, key } to open the checkout.
+     */
+    @PostMapping("/create-order")
+    public ResponseEntity<?> createOrder() {
+        // SECURITY: always get email from JWT token — never from request body
+        String email = getAuthenticatedEmail();
+        try {
+            Map<String, Object> orderDetails = paymentService.createOrder(email);
+            return ResponseEntity.ok(orderDetails);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to create payment order: " + e.getMessage()));
         }
     }
 
-    @PostMapping("/cancel-subscription")
-    public ResponseEntity<Map<String, String>> cancelSubscription(Authentication auth) {
-        paymentService.cancelSubscription(auth.getName());
-        return ResponseEntity.ok(Map.of("status", "success", "message",
-                "Subscription cancelled. You will retain premium until billing period ends."));
+    // ─── 2. Verify Signature (called by frontend after checkout success) ───────
+
+    /**
+     * Authenticated endpoint.
+     * Verifies Razorpay payment signature.
+     * Marks payment as VERIFIED — does NOT upgrade user.
+     * Actual upgrade happens only after webhook payment.captured.
+     */
+    @PostMapping("/verify")
+    public ResponseEntity<?> verifyPayment(@RequestBody Map<String, String> payload) {
+        String orderId   = payload.get("razorpay_order_id");
+        String paymentId = payload.get("razorpay_payment_id");
+        String signature = payload.get("razorpay_signature");
+
+        if (orderId == null || paymentId == null || signature == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Missing required payment fields"));
+        }
+
+        boolean isValid = paymentService.verifyAndMarkPayment(orderId, paymentId, signature);
+
+        if (isValid) {
+            // Return success — client can show "payment received, activating..."
+            // Actual upgrade is done by the webhook
+            return ResponseEntity.ok(Map.of(
+                "status", "verified",
+                "message", "Payment received! Your account will be upgraded shortly."
+            ));
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Payment signature verification failed."));
+        }
     }
 
-    // Webhook endpoint (Requires unauthenticated access in SecurityConfig)
+    // ─── 3. Manual Token Refresh after Upgrade ────────────────────────────────
+
+    /**
+     * Authenticated endpoint.
+     * Generates a fresh JWT for the current user reflecting their updated plan.
+     * Frontend calls this after receiving the webhook-triggered upgrade.
+     */
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken() {
+        String email = getAuthenticatedEmail();
+        try {
+            String newToken = authService.refreshTokenForUser(email);
+            return ResponseEntity.ok(Map.of("token", newToken));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to refresh token: " + e.getMessage()));
+        }
+    }
+
+    // ─── 4. Webhook (unauthenticated — Razorpay calls this) ───────────────────
+
+    /**
+     * Unauthenticated endpoint (allowed in SecurityConfig).
+     * Razorpay sends events here (payment.captured, payment.failed, etc).
+     * Signature is verified using webhook secret before processing.
+     */
     @PostMapping("/webhook")
-    public ResponseEntity<Void> razorpayWebhook(@RequestBody String payload,
+    public ResponseEntity<Void> razorpayWebhook(
+            @RequestBody String payload,
             @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature) {
-        // Implement webhook validation and state syncing here for recurring charges
-        // E.g., capturing "subscription.charged", "subscription.halted"
-        System.out.println("Razorpay Webhook Triggered: " + payload);
-        return ResponseEntity.ok().build();
+
+        if (signature == null || signature.isBlank()) {
+            System.out.println("[Webhook] Rejected: missing signature header");
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            paymentService.handleWebhookEvent(payload, signature);
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            System.err.println("[Webhook] Signature mismatch: " + e.getMessage());
+            return ResponseEntity.status(401).build();
+        } catch (Exception e) {
+            System.err.println("[Webhook] Error processing event: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // ─── Helper ───────────────────────────────────────────────────────────────
+
+    private String getAuthenticatedEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            throw new IllegalStateException("No authenticated user in security context");
+        }
+        return auth.getName();
     }
 }

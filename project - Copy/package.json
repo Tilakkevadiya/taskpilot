@@ -6,10 +6,13 @@
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
     "@stripe/stripe-js": "^8.7.0",
+    "aos": "^2.3.4",
     "axios": "^1.13.6",
+    "framer-motion": "^12.36.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^6.20.0",
     "stripe": "^20.3.1"
   },

@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Crown, User, LogOut, ChevronDown, Camera, Edit } from 'lucide-react'
-import { checkPremiumStatus, formatPremiumStatus } from '../../utils/premiumUtils'
+import { useNavigate } from 'react-router-dom'
+import { useUsage } from '../../context/UsageContext'
 import axios from 'axios'
 import './Header.css'
 
-const Header = ({ onPremiumClick, userData, onLogout }) => {
-  const [premiumStatus, setPremiumStatus] = useState(null)
+const Header = ({ userData, onLogout }) => {
   const [showProfile, setShowProfile] = useState(false)
   const [showPhotoEditor, setShowPhotoEditor] = useState(false)
   const [profilePhoto, setProfilePhoto] = useState(localStorage.getItem('userProfilePhoto') || null)
-  const [usage, setUsage] = useState(null)
+  const navigate = useNavigate()
+  const { usage } = useUsage()
+
+  const isPremium = usage?.plan === 'PREMIUM'
 
   const cartoonAvatars = [
     '👨‍💼', '👩‍💼', '🧑‍💼', '👨‍🎓', '👩‍🎓', '🧑‍🎓',
@@ -19,21 +22,6 @@ const Header = ({ onPremiumClick, userData, onLogout }) => {
     '🦸', '🦹', '🦺', '🦸‍♂️', '🦹‍♂️', '🦺‍♂️',
     '🤖', '👽', '🤠', '🦄', '🦢', '🦣'
   ]
-
-  useEffect(() => {
-    const fetchUsage = async () => {
-      try {
-        const res = await axios.get('https://taskpilot-backend-n09v.onrender.com/api/usage/current')
-        setUsage(res.data)
-        const isPrem = res.data.plan === 'PREMIUM'
-        setPremiumStatus({ isPremium: isPrem })
-      } catch (err) {
-        console.error('Failed to fetch usage:', err)
-        setPremiumStatus(checkPremiumStatus())
-      }
-    }
-    fetchUsage()
-  }, [])
 
   const handlePhotoUpload = (event) => {
     const file = event.target.files[0]
@@ -70,24 +58,16 @@ const Header = ({ onPremiumClick, userData, onLogout }) => {
         <input type="text" placeholder="Search..." className="search-input" />
       </div>
       <div className="header-actions">
-        {usage && !premiumStatus?.isPremium && (
-          <div className="usage-counters">
-            <div className="usage-badge" title="Emails Left">📧 {usage.emails.remaining}</div>
-            <div className="usage-badge" title="Voice Commands Left">🎙️ {usage.voice_commands.remaining}</div>
-            <div className="usage-badge" title="Tasks Left">✅ {usage.tasks.remaining}</div>
+        {isPremium ? (
+          <div className="premium-badge">
+            <Crown size={16} />
+            Premium
           </div>
-        )}
-
-        {!premiumStatus?.isPremium ? (
-          <button className="premium-btn" onClick={onPremiumClick} data-premium-btn>
+        ) : (
+          <button className="premium-btn" onClick={() => navigate('/upgrade')} data-premium-btn>
             <Crown size={18} />
             Upgrade to Premium
           </button>
-        ) : (
-          <div className="premium-badge">
-            <Crown size={16} />
-            {formatPremiumStatus().status}
-          </div>
         )}
 
         <div className="profile-section">
@@ -130,10 +110,10 @@ const Header = ({ onPremiumClick, userData, onLogout }) => {
                   <div className="profile-details">
                     <h4>{userData?.name || 'User'}</h4>
                     <p>{userData?.email || 'user@example.com'}</p>
-                    {premiumStatus?.isPremium && (
+                    {isPremium && (
                       <span className="premium-status">
                         <Crown size={12} />
-                        {formatPremiumStatus().message}
+                        Premium
                       </span>
                     )}
                   </div>
@@ -145,9 +125,9 @@ const Header = ({ onPremiumClick, userData, onLogout }) => {
                   <Edit size={18} />
                   <span>Edit Profile Photo</span>
                 </button>
-                <button className="menu-item" onClick={onPremiumClick}>
+                <button className="menu-item" onClick={() => { navigate('/upgrade'); setShowProfile(false) }}>
                   <Crown size={18} />
-                  <span>{premiumStatus?.isPremium ? 'Manage Plan' : 'Upgrade to Premium'}</span>
+                  <span>{isPremium ? 'Manage Plan' : 'Upgrade to Premium'}</span>
                 </button>
                 <div className="menu-divider"></div>
                 <button className="menu-item logout" onClick={handleLogout}>

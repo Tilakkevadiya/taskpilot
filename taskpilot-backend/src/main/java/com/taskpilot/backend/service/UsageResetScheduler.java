@@ -21,6 +21,12 @@ public class UsageResetScheduler {
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void cleanupOldUsageLogs() {
+        // According to user request: need to effectively "reset" usage.
+        // Instead of actively resetting fields on existing rows, our logic in FeatureAccessService
+        // queries by `LocalDate.now()`. This means yesterday's logs naturally won't affect today's limits.
+        // Thus, keeping `deleteByUsageDateBefore(LocalDate.now().minusDays(30))` is perfectly sufficient 
+        // to prevent bloat without breaking the "reset" mechanism, since limits reset automatically 
+        // on a new calendar date.
         usageRepository.deleteByUsageDateBefore(LocalDate.now().minusDays(30));
     }
 }

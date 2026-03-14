@@ -1,45 +1,16 @@
-import React, { useState } from 'react'
-import { Calendar, Plus, Clock, Users, MapPin, Video, Trash2, Edit2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Calendar, Plus, Clock, Users, MapPin, Video, Trash2, Edit2, Loader } from 'lucide-react'
+import axios from 'axios'
+import { useUsage } from '../../context/UsageContext'
 import './Meetings.css'
+import { toast } from 'react-hot-toast'
 
 const Meetings = () => {
-  const [meetings, setMeetings] = useState([
-    { 
-      id: 1, 
-      title: 'Team Standup', 
-      date: '2024-12-20', 
-      time: '10:00 AM', 
-      duration: 30, 
-      participants: ['John', 'Sarah', 'Mike'],
-      location: 'Conference Room A',
-      type: 'in-person',
-      description: 'Daily team standup meeting to discuss progress and blockers'
-    },
-    { 
-      id: 2, 
-      title: 'Client Presentation', 
-      date: '2024-12-21', 
-      time: '2:00 PM', 
-      duration: 60, 
-      participants: ['Client Team', 'Sales Team'],
-      location: 'Zoom',
-      type: 'virtual',
-      description: 'Present Q4 results and discuss next quarter plans'
-    },
-    { 
-      id: 3, 
-      title: 'Project Review', 
-      date: '2024-12-22', 
-      time: '11:00 AM', 
-      duration: 45, 
-      participants: ['Project Team'],
-      location: 'Conference Room B',
-      type: 'in-person',
-      description: 'Review project milestones and timeline'
-    },
-  ])
-
+  const { fetchUsage } = useUsage()
+  const [meetings, setMeetings] = useState([])
   const [showAddMeeting, setShowAddMeeting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState({})
   const [newMeeting, setNewMeeting] = useState({
     title: '',
     date: '',
@@ -48,17 +19,82 @@ const Meetings = () => {
     participants: '',
     location: '',
     type: 'in-person',
-    description: ''
+    description: '',
+    reminderMinutesBefore: null
   })
 
-  const addMeeting = () => {
-    if (newMeeting.title && newMeeting.date && newMeeting.time) {
-      const meeting = {
-        id: meetings.length + 1,
-        ...newMeeting,
-        participants: newMeeting.participants.split(',').map(p => p.trim()).filter(p => p)
+  const fetchMeetings = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get('http://localhost:8080/api/meetings', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const mappedMeetings = response.data.data.map(m => ({
+        ...m,
+        participants: typeof m.participants === 'string' 
+          ? m.participants.split(',').filter(p => p.trim()) 
+          : Array.isArray(m.participants) ? m.participants : []
+      }))
+      setMeetings(mappedMeetings)
+    } catch (error) {
+      console.error('Failed to fetch meetings:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchMeetings()
+  }, [])
+
+  const validateMeeting = () => {
+    const newErrors = {}
+    const today = new Date().toISOString().split("T")[0]
+    const now = new Date()
+
+    if (!newMeeting.title.trim()) newErrors.title = 'Meeting title is required'
+    if (!newMeeting.date) newErrors.date = 'Date is required'
+    else if (newMeeting.date < today) newErrors.date = 'Date cannot be in the past'
+
+    if (newMeeting.time && newMeeting.date === today) {
+      const selectedTime = new Date(`${newMeeting.date}T${newMeeting.time}`)
+      if (selectedTime < now) newErrors.time = 'Time must be in the future'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const addMeeting = async () => {
+    if (!validateMeeting()) return
+    setIsLoading(true)
+
+    try {
+      const meetingTime = new Date(`${newMeeting.date}T${newMeeting.time}`).toISOString();
+      const meetingData = {
+        title: newMeeting.title,
+        meetingTime: meetingTime,
+        participants: newMeeting.participants.split(',').map(p => p.trim()).filter(p => p).join(','),
+        location: newMeeting.location,
+        type: newMeeting.type,
+        duration: newMeeting.duration,
+        description: newMeeting.description,
+        reminderMinutesBefore: newMeeting.reminderMinutesBefore
       }
-      setMeetings([...meetings, meeting])
+      
+      console.log("Sending meeting:", meetingData)
+      const token = localStorage.getItem('token')
+      const response = await axios.post('http://localhost:8080/api/meetings', meetingData, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      const createdMeeting = {
+        ...response.data.data,
+        participants: typeof response.data.data.participants === 'string'
+          ? response.data.data.participants.split(',').filter(p => p.trim())
+          : Array.isArray(response.data.data.participants) ? response.data.data.participants : []
+      }
+      
+      setMeetings(prev => [...prev, createdMeeting])
+      
       setNewMeeting({
         title: '',
         date: '',
@@ -67,18 +103,46 @@ const Meetings = () => {
         participants: '',
         location: '',
         type: 'in-person',
-        description: ''
+        description: '',
+        reminderMinutesBefore: null
       })
       setShowAddMeeting(false)
+      fetchMeetings() // Sync in background
+      await fetchUsage()
+      toast.success("Meeting scheduled! 📅")
+    } catch (error) {
+      console.error('Failed to schedule meeting details:', error)
+      if (error.response) console.error('Response data:', error.response.data)
+      
+      const msg = error.response?.data?.error || error.response?.data?.message || 'Failed to schedule meeting';
+      if (error.response?.status === 403) {
+        toast.error(msg + ' ✨', { duration: 5000 })
+      } else {
+        toast.error(msg)
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const deleteMeeting = (id) => {
+  const deleteMeeting = async (id) => {
+    const previous = [...meetings];
     setMeetings(meetings.filter(meeting => meeting.id !== id))
+    try {
+      const token = localStorage.getItem('token')
+      await axios.delete(`http://localhost:8080/api/meetings/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.success("Meeting deleted 🗑️")
+    } catch(err) {
+      console.error(err)
+      toast.error("Failed to delete meeting")
+      setMeetings(previous);
+    }
   }
 
-  const upcomingMeetings = meetings.filter(m => new Date(m.date) >= new Date().setHours(0,0,0,0))
-  const pastMeetings = meetings.filter(m => new Date(m.date) < new Date().setHours(0,0,0,0))
+  const upcomingMeetings = meetings.filter(m => new Date(m.meetingTime) >= new Date().setHours(0,0,0,0))
+  const pastMeetings = meetings.filter(m => new Date(m.meetingTime) < new Date().setHours(0,0,0,0))
 
   return (
     <div className="content-area">
@@ -103,18 +167,21 @@ const Meetings = () => {
               placeholder="Enter meeting title..."
               value={newMeeting.title}
               onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })}
-              className="input"
+              className={`input ${errors.title ? 'input-error' : ''}`}
             />
+            {errors.title && <span className="error-text">{errors.title}</span>}
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>Date</label>
               <input
                 type="date"
+                min={new Date().toISOString().split("T")[0]}
                 value={newMeeting.date}
                 onChange={(e) => setNewMeeting({ ...newMeeting, date: e.target.value })}
-                className="input"
+                className={`input ${errors.date ? 'input-error' : ''}`}
               />
+              {errors.date && <span className="error-text">{errors.date}</span>}
             </div>
             <div className="form-group">
               <label>Time</label>
@@ -122,8 +189,9 @@ const Meetings = () => {
                 type="time"
                 value={newMeeting.time}
                 onChange={(e) => setNewMeeting({ ...newMeeting, time: e.target.value })}
-                className="input"
+                className={`input ${errors.time ? 'input-error' : ''}`}
               />
+              {errors.time && <span className="error-text">{errors.time}</span>}
             </div>
             <div className="form-group">
               <label>Duration (minutes)</label>
@@ -171,22 +239,38 @@ const Meetings = () => {
               className="input"
             />
           </div>
-          <div className="form-group">
-            <label>Description</label>
-            <textarea
-              rows="3"
-              placeholder="Meeting agenda and description..."
-              value={newMeeting.description}
-              onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })}
-              className="input textarea"
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Reminder</label>
+              <select
+                value={newMeeting.reminderMinutesBefore || ''}
+                onChange={(e) => setNewMeeting({ ...newMeeting, reminderMinutesBefore: e.target.value ? parseInt(e.target.value) : null })}
+                className="input"
+              >
+                <option value="">No reminder</option>
+                <option value="10">10 minutes before</option>
+                <option value="30">30 minutes before</option>
+                <option value="60">1 hour before</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                rows="3"
+                placeholder="Meeting agenda and description..."
+                value={newMeeting.description}
+                onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })}
+                className="input textarea"
+              />
+            </div>
           </div>
           <div className="form-actions">
             <button className="btn btn-secondary" onClick={() => setShowAddMeeting(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={addMeeting}>
-              Schedule Meeting
+            <button className="btn btn-primary" onClick={addMeeting} disabled={isLoading}>
+              {isLoading ? <Loader className="spinner" size={18} /> : null}
+              {isLoading ? 'Scheduling...' : 'Schedule Meeting'}
             </button>
           </div>
         </div>
@@ -218,7 +302,7 @@ const Meetings = () => {
               <div className="meeting-details">
                 <div className="meeting-detail-item">
                   <Clock size={16} />
-                  <span>{meeting.date} at {meeting.time}</span>
+                  <span>{new Date(meeting.meetingTime).toLocaleString()}</span>
                 </div>
                 <div className="meeting-detail-item">
                   <MapPin size={16} />
@@ -257,7 +341,7 @@ const Meetings = () => {
                 <div className="meeting-details">
                   <div className="meeting-detail-item">
                     <Clock size={16} />
-                    <span>{meeting.date} at {meeting.time}</span>
+                    <span>{new Date(meeting.meetingTime).toLocaleString()}</span>
                   </div>
                 </div>
               </div>

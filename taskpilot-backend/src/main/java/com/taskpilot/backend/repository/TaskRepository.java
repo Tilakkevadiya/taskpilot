@@ -11,5 +11,7 @@ import java.util.List;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByUser(User user);
 
-    List<Task> findByUserOrderByDueDateAsc(User user);
+    List<Task> findByUserOrderByDueTimeAsc(User user);
+
+    List<Task> findByReminderSentFalseAndReminderMinutesBeforeIsNotNull();
 }

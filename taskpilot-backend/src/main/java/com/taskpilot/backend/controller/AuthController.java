@@ -1,13 +1,17 @@
 package com.taskpilot.backend.controller;
 
-import com.taskpilot.backend.dto.*;
+import com.taskpilot.backend.dto.AuthRequest;
+import com.taskpilot.backend.dto.AuthResponse;
+import com.taskpilot.backend.dto.AuthFlows;
+import com.taskpilot.backend.dto.RefreshTokenFlow;
+import com.taskpilot.backend.dto.RegisterRequest;
 import com.taskpilot.backend.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
-import java.util.HashMap;
+import com.taskpilot.backend.repository.UserRepository;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -17,41 +21,88 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+        AuthResponse response = authService.authenticateUser(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest request) {
-        Map<String, String> response = new HashMap<>();
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            String message = authService.register(request);
-            response.put("message", message);
-            return new ResponseEntity<>(response, HttpStatus.CREATED);
-        } catch (Exception e) {
-            response.put("error", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            authService.registerUser(request);
+            return ResponseEntity.ok("User registered successfully");
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
 
-    @PostMapping("/login-password")
-    public ResponseEntity<?> loginPassword(@RequestBody AuthRequest loginDto) {
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenFlow.Response> refreshToken(@RequestBody RefreshTokenFlow.Request request) {
         try {
-            AuthResponse authResponse = authService.loginPassword(loginDto);
-            return ResponseEntity.ok(authResponse);
-        } catch (Exception e) {
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+            return ResponseEntity.ok(authService.refreshToken(request));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(null);
         }
     }
 
-    @PostMapping("/google")
-    public ResponseEntity<?> googleLogin(@RequestBody GoogleAuthRequest request) {
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody AuthFlows.VerifyEmailRequest request) {
         try {
-            AuthResponse authResponse = authService.googleLogin(request.getIdToken());
-            return ResponseEntity.ok(authResponse);
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Google auth failed");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+            authService.verifyEmail(request.getToken());
+            return ResponseEntity.ok("Email verified successfully");
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
         }
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody AuthFlows.ForgotPasswordRequest request) {
+        try {
+            authService.forgotPassword(request.getEmail());
+            return ResponseEntity.ok("Password reset email sent");
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody AuthFlows.ResetPasswordRequest request) {
+        try {
+            authService.resetPassword(request.getToken(), request.getNewPassword());
+            return ResponseEntity.ok("Password reset successfully");
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @PostMapping("/oauth/google")
+    public ResponseEntity<?> googleLogin(@RequestBody AuthFlows.GoogleAuthRequest request) {
+        try {
+            AuthResponse response = authService.googleLogin(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).body("Not authenticated");
+        }
+        
+        return userRepository.findByEmail(auth.getName())
+                .map(user -> ResponseEntity.ok(new AuthResponse.UserDto(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getEmail(),
+                        user.getPlanType().name()
+                )))
+                .orElse(ResponseEntity.status(404).build());
     }
 }

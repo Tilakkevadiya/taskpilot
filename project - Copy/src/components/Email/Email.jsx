@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Send, Plus, Mail, Trash2, Edit2, Paperclip, Loader, CheckCircle2, AlertCircle } from 'lucide-react'
 import axios from 'axios'
+import { useUsage } from '../../context/UsageContext'
 import './Email.css'
+import { toast } from 'react-hot-toast'
 
 const Email = () => {
+  const { decrementUsage } = useUsage()
   const [emails, setEmails] = useState([])
 
   // Load emails from localStorage on component mount
@@ -31,37 +34,96 @@ const Email = () => {
   const [isEditing, setIsEditing] = useState(false)
   const [editingEmailId, setEditingEmailId] = useState(null)
   const [isSending, setIsSending] = useState(false)
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+  const [errors, setErrors] = useState({})
   const [composeData, setComposeData] = useState({
     to: '',
     subject: '',
     body: '',
     attachments: []
   })
+  const [selectedFiles, setSelectedFiles] = useState([])
+  const [contacts, setContacts] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [filteredContacts, setFilteredContacts] = useState([])
 
-  const handleCompose = () => {
-    if (composeData.to && composeData.subject && composeData.body) {
-      const newEmail = {
-        id: Date.now(), // Use timestamp for unique ID
-        ...composeData,
-        status: 'draft',
-        date: new Date().toISOString().split('T')[0]
+  // Fetch Google Contacts if applicable
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const user = JSON.parse(localStorage.getItem('user'))
+      if (user?.planType === 'PREMIUM') {
+        try {
+          const res = await axios.get('http://localhost:8080/api/email/contacts')
+          setContacts(res.data)
+        } catch (err) {
+          console.error("Failed to fetch contacts", err)
+        }
       }
+    }
+    fetchContacts()
+  }, [])
 
-      // Save to localStorage
-      const currentEmails = JSON.parse(localStorage.getItem('emails') || '[]')
-      const updatedEmails = [newEmail, ...currentEmails]
-      localStorage.setItem('emails', JSON.stringify(updatedEmails))
-      setEmails(updatedEmails)
-
-      setComposeData({ to: '', subject: '', body: '', attachments: [] })
-      setShowCompose(false)
+  const handleToChange = (e) => {
+    const value = e.target.value
+    setComposeData({ ...composeData, to: value })
+    if (value.length > 1) {
+      const filtered = contacts.filter(c => 
+        c.name?.toLowerCase().includes(value.toLowerCase()) || 
+        c.email?.toLowerCase().includes(value.toLowerCase())
+      )
+      setFilteredContacts(filtered)
+      setShowSuggestions(filtered.length > 0)
+    } else {
+      setShowSuggestions(false)
     }
   }
 
-  const showToast = (message, type = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  const selectContact = (email) => {
+    setComposeData({ ...composeData, to: email })
+    setShowSuggestions(false)
+  }
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files)
+    const validFiles = files.filter(file => file.size <= 20 * 1024 * 1024)
+    if (validFiles.length < files.length) {
+      toast.error("Some files exceed the 20MB limit.")
+    }
+    setSelectedFiles([...selectedFiles, ...validFiles])
+  }
+
+  const removeFile = (index) => {
+    setSelectedFiles(selectedFiles.filter((_, i) => i !== index))
+  }
+
+  const validateCompose = () => {
+    const newErrors = {}
+    if (!composeData.to) newErrors.to = 'Recipient email is required'
+    else if (!/\S+@\S+\.\S+/.test(composeData.to)) newErrors.to = 'Invalid email format'
+    if (!composeData.subject.trim()) newErrors.subject = 'Subject is required'
+    if (!composeData.body.trim()) newErrors.body = 'Email body is required'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleCompose = () => {
+    if (!validateCompose()) return
+    
+    const newEmail = {
+      id: Date.now(),
+      ...composeData,
+      status: 'draft',
+      date: new Date().toISOString().split('T')[0]
+    }
+
+    const currentEmails = JSON.parse(localStorage.getItem('emails') || '[]')
+    const updatedEmails = [newEmail, ...currentEmails]
+    localStorage.setItem('emails', JSON.stringify(updatedEmails))
+    setEmails(updatedEmails)
+
+    setComposeData({ to: '', subject: '', body: '', attachments: [] })
+    setShowCompose(false)
+    toast.success("Draft saved! 📝")
   }
 
   const sendEmail = async (id) => {
@@ -69,24 +131,27 @@ const Email = () => {
     if (email) {
       setIsSending(true);
       try {
-        const token = localStorage.getItem('token');
-        await axios.post('https://taskpilot-backend-n09v.onrender.com/api/email/send', {
-          to: email.to,
-          subject: email.subject,
-          body: email.body
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        showToast('Email sent successfully!');
+        const formData = new FormData()
+        formData.append('to', email.to)
+        formData.append('subject', email.subject)
+        formData.append('body', email.body)
+        // Note: Drafts in localStorage don't store actual File objects easily, 
+        // so for now we send without files if it's from a saved draft 
+        // unless we implement a more complex storage logic.
 
-        // Update email status to sent
+        await axios.post('http://localhost:8080/api/email/send', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        toast.success('Email sent successfully! ✈️');
+
         const updatedEmails = emails.map(e =>
           e.id === id ? { ...e, status: 'sent' } : e
         )
         localStorage.setItem('emails', JSON.stringify(updatedEmails))
         setEmails(updatedEmails)
+        decrementUsage('emails');
       } catch (err) {
-        showToast('Failed to send email.', 'error');
+        toast.error('Failed to send email.');
       } finally {
         setIsSending(false);
       }
@@ -94,34 +159,58 @@ const Email = () => {
   }
 
   const handleComposeSend = async () => {
-    if (composeData.to && composeData.subject && composeData.body) {
-      setIsSending(true);
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post('https://taskpilot-backend-n09v.onrender.com/api/email/send', {
-          to: composeData.to,
-          subject: composeData.subject,
-          body: composeData.body
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+    if (!validateCompose()) return
+    setIsSending(true);
+    try {
+      const formData = new FormData()
+      formData.append('to', composeData.to)
+      formData.append('subject', composeData.subject)
+      formData.append('body', composeData.body)
+      selectedFiles.forEach(file => {
+        formData.append('files', file)
+      })
 
-        const newEmail = {
-          id: emails.length + 1,
-          ...composeData,
-          status: 'sent',
-          date: new Date().toISOString().split('T')[0]
+      await axios.post('http://localhost:8080/api/email/send', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
         }
-        setEmails([newEmail, ...emails])
-        setComposeData({ to: '', subject: '', body: '', attachments: [] })
-        setShowCompose(false)
-        showToast('Email sent successfully!');
-      } catch (err) {
-        showToast('Failed to send email. Draft saved.', 'error');
-        handleCompose(); // fallback save to draft
-      } finally {
-        setIsSending(false);
+      });
+
+      const newEmail = {
+        id: Date.now(),
+        ...composeData,
+        status: 'sent',
+        date: new Date().toISOString().split('T')[0]
       }
+      
+      const currentEmails = JSON.parse(localStorage.getItem('emails') || '[]')
+      const updatedEmails = [newEmail, ...currentEmails]
+      localStorage.setItem('emails', JSON.stringify(updatedEmails))
+      setEmails(updatedEmails)
+
+      setComposeData({ to: '', subject: '', body: '', attachments: [] })
+      setSelectedFiles([])
+      setShowCompose(false)
+      toast.success('Email sent successfully! 🚀');
+      decrementUsage('emails');
+    } catch (err) {
+      toast.error('Failed to send email. Draft saved.');
+      // Auto-save as draft on failure
+      const newEmail = {
+        id: Date.now(),
+        ...composeData,
+        status: 'draft',
+        date: new Date().toISOString().split('T')[0]
+      }
+      const currentEmails = JSON.parse(localStorage.getItem('emails') || '[]')
+      const updatedEmails = [newEmail, ...currentEmails]
+      localStorage.setItem('emails', JSON.stringify(updatedEmails))
+      setEmails(updatedEmails)
+      setShowCompose(false)
+      setComposeData({ to: '', subject: '', body: '', attachments: [] })
+      setSelectedFiles([])
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -211,25 +300,37 @@ const Email = () => {
         </button>
       </div>
 
-      {toast.show && (
-        <div className={`toast-notification ${toast.type}`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.message}</span>
-        </div>
-      )}
 
       {showCompose && (
-        <div className="compose-card card">
+        <div className="compose-card glass-card">
           <h3>{isEditing ? 'Edit Email' : 'Compose Email'}</h3>
           <div className="form-group">
             <label>To</label>
-            <input
-              type="email"
-              placeholder="recipient@example.com"
-              value={composeData.to}
-              onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
-              className="input"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="email"
+                placeholder="recipient@example.com"
+                value={composeData.to}
+                onChange={handleToChange}
+                onFocus={() => composeData.to.length > 1 && setShowSuggestions(true)}
+                className={`input ${errors.to ? 'input-error' : ''}`}
+              />
+              {showSuggestions && (
+                <div className="contact-suggestions glass-card">
+                  {filteredContacts.map((contact, i) => (
+                    <div 
+                      key={i} 
+                      className="suggestion-item"
+                      onClick={() => selectContact(contact.email)}
+                    >
+                      <span className="contact-name">{contact.name}</span>
+                      <span className="contact-email">{contact.email}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {errors.to && <span className="error-text">{errors.to}</span>}
           </div>
           <div className="form-group">
             <label>Subject</label>
@@ -238,8 +339,9 @@ const Email = () => {
               placeholder="Email subject..."
               value={composeData.subject}
               onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
-              className="input"
+              className={`input ${errors.subject ? 'input-error' : ''}`}
             />
+            {errors.subject && <span className="error-text">{errors.subject}</span>}
           </div>
           <div className="form-group">
             <label>Message</label>
@@ -248,14 +350,37 @@ const Email = () => {
               placeholder="Type your message here... You can also use natural language commands like 'Draft an email to John about the project deadline'"
               value={composeData.body}
               onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
-              className="input textarea"
+              className={`input textarea ${errors.body ? 'input-error' : ''}`}
             />
+            {errors.body && <span className="error-text">{errors.body}</span>}
           </div>
           <div className="compose-actions">
-            <button className="btn btn-secondary">
-              <Paperclip size={18} />
-              Attach
-            </button>
+            <div className="attachment-section">
+              <input 
+                type="file" 
+                id="file-upload" 
+                multiple 
+                style={{ display: 'none' }} 
+                onChange={handleFileChange}
+              />
+              <button className="btn btn-secondary" onClick={() => document.getElementById('file-upload').click()}>
+                <Paperclip size={18} />
+                Attach
+              </button>
+              
+              {selectedFiles.length > 0 && (
+                <div className="selected-files">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="file-chip">
+                      <span className="file-name">{file.name}</span>
+                      <button onClick={() => removeFile(index)} className="remove-file">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div>
               <button className="btn btn-secondary" onClick={handleCancelEdit}>
                 Cancel
@@ -276,7 +401,7 @@ const Email = () => {
       )}
 
       <div className="email-layout">
-        <div className="email-list">
+        <div className="email-list glass-card">
           <div className="email-list-header">
             <h3>Emails</h3>
             <span className="email-count">{emails.length} total</span>
@@ -309,7 +434,7 @@ const Email = () => {
           </div>
         </div>
 
-        <div className="email-detail">
+        <div className="email-detail glass-card">
           {selectedEmail ? (
             <div className="email-detail-content">
               <div className="email-detail-header">

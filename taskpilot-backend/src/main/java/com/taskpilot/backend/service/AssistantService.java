@@ -1,5 +1,7 @@
 package com.taskpilot.backend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskpilot.backend.dto.FeatureResponse;
 import com.taskpilot.backend.dto.ParseRequest;
 import com.taskpilot.backend.dto.ParseResponse;
@@ -10,102 +12,88 @@ import com.taskpilot.backend.repository.CommandHistoryRepository;
 import com.taskpilot.backend.repository.UserRepository;
 import com.taskpilot.backend.entity.Task;
 import com.taskpilot.backend.entity.Meeting;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class AssistantService {
 
-    @Value("${ai.service.url}")
-    private String aiServiceUrl;
-
-    @Autowired
-    private CommandHistoryRepository commandHistoryRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RestTemplate restTemplate;
-
-    @Autowired
-    private TaskService taskService;
-
-    @Autowired
-    private MeetingService meetingService;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private FeatureAccessService featureAccessService;
+    private final CommandHistoryRepository commandHistoryRepository;
+    private final UserRepository userRepository;
+    private final AIService aiService;
+    private final TaskService taskService;
+    private final MeetingService meetingService;
+    private final UserEmailService userEmailService;
+    private final FeatureAccessService featureAccessService;
+    private final ObjectMapper objectMapper;
 
     public FeatureResponse<ParseResponse> processCommand(ParseRequest request, String userEmail) {
-
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        featureAccessService.checkAndConsumeUsage(user,
-                FeatureAccessService.Feature.VOICE_COMMAND);
-
-        // 1. Call FastAPI Service
-        String url = aiServiceUrl + "/assistant/parse";
-        ParseResponse pythonResponse = restTemplate.postForObject(url, request, ParseResponse.class);
-
-        // 2. Execute Action based on Intent
+        ParseResponse parseResponse = new ParseResponse();
         String executionStatus = "SUCCESS";
-        if (pythonResponse != null) {
-            String intent = pythonResponse.getIntent();
-            try {
-                if ("CREATE_TASK".equalsIgnoreCase(intent)) {
-                    Task task = new Task();
-                    task.setTitle((String) pythonResponse.getEntities().getOrDefault("title", "New Task"));
-                    task.setPriority((String) pythonResponse.getEntities().getOrDefault("priority", "medium"));
-                    taskService.createTask(task, userEmail);
-                } else if ("SEND_EMAIL".equalsIgnoreCase(intent)) {
-                    featureAccessService.checkAndConsumeUsage(user, FeatureAccessService.Feature.EMAIL);
-                    String to = (String) pythonResponse.getEntities().get("email");
-                    String msg = (String) pythonResponse.getEntities().get("message");
-                    emailService.sendEmail(to, "Message from TaskPilot AI", msg);
-                } else if ("CREATE_MEETING".equalsIgnoreCase(intent)) {
-                    Meeting meeting = new Meeting();
-                    meeting.setTitle((String) pythonResponse.getEntities().getOrDefault("title", "Meeting"));
-                    // For simplified demo, we parse string to simple fields. Actual implementation
-                    // parses LocalDateTime
-                    // meeting.setMeetingTime(...);
-                    meetingService.createMeeting(meeting, userEmail);
-                } else if ("UNKNOWN".equalsIgnoreCase(intent)) {
-                    executionStatus = "FAILED";
-                }
-            } catch (Exception e) {
-                executionStatus = "FAILED";
-                pythonResponse.setReply("I understood the command, but there was an error executing it.");
+
+        try {
+            featureAccessService.checkAndConsumeUsage(user, FeatureAccessService.Feature.AI_REQUEST);
+
+            // 1. Call Groq via AIService
+            String groqResponse = aiService.parseIntent(request.getText());
+            if (groqResponse == null) {
+                throw new RuntimeException("AI Service is temporarily unavailable. Please check your Groq API key.");
             }
-        } else {
+
+            JsonNode root = objectMapper.readTree(groqResponse);
+            parseResponse.setIntent(root.path("intent").asText("UNKNOWN"));
+            parseResponse.setReply(root.path("reply").asText("Done!"));
+            
+            Map<String, Object> entities = new HashMap<>();
+            root.path("entities").fields().forEachRemaining(entry -> entities.put(entry.getKey(), entry.getValue().asText()));
+            parseResponse.setEntities(entities);
+
+            // 2. Execute Action
+            String intent = parseResponse.getIntent();
+            if ("CREATE_TASK".equalsIgnoreCase(intent)) {
+                Task task = new Task();
+                task.setTitle((String) entities.getOrDefault("title", "New Task"));
+                task.setPriority((String) entities.getOrDefault("priority", "medium"));
+                taskService.createTask(task, userEmail);
+            } else if ("SEND_EMAIL".equalsIgnoreCase(intent)) {
+                featureAccessService.checkAndConsumeUsage(user, FeatureAccessService.Feature.EMAIL);
+                String to = (String) entities.get("email");
+                String msg = (String) entities.get("message");
+                // Assistant using UserEmailService (User mode)
+                userEmailService.sendEmail(user, to, "TaskPilot AI Assistant", msg);
+            } else if ("CREATE_MEETING".equalsIgnoreCase(intent)) {
+                Meeting meeting = new Meeting();
+                meeting.setTitle((String) entities.getOrDefault("title", "Meeting"));
+                meetingService.createMeeting(meeting, userEmail);
+            } else if ("UNKNOWN".equalsIgnoreCase(intent)) {
+                executionStatus = "FAILED";
+            }
+        } catch (Exception e) {
             executionStatus = "FAILED";
-            pythonResponse = new ParseResponse();
-            pythonResponse.setReply("Could not process command via AI.");
+            parseResponse.setIntent("UNKNOWN");
+            parseResponse.setReply("I understood the command, but there was an error executing it.");
+            System.err.println("Assistant execution error: " + e.getMessage());
         }
 
-        // 3. Save Command History
-        saveCommandHistory(request.getText(), pythonResponse, executionStatus, user);
-
-        // Fetch latest usage stats after whatever actions occurred
-        UsageResponse finalUsage = featureAccessService.getUsageStats(user, FeatureAccessService.Feature.VOICE_COMMAND);
-        return new FeatureResponse<>(pythonResponse, finalUsage);
+        saveCommandHistory(request.getText(), parseResponse, executionStatus, user);
+        UsageResponse finalUsage = featureAccessService.getUsageStats(user, FeatureAccessService.Feature.AI_REQUEST);
+        return new FeatureResponse<>(parseResponse, finalUsage);
     }
 
     private void saveCommandHistory(String rawText, ParseResponse response, String status, User user) {
-        if (user != null) {
-            CommandHistory history = new CommandHistory();
-            history.setUser(user);
-            history.setRawText(rawText);
-            history.setDetectedIntent(response.getIntent());
-            history.setAssistantReply(response.getReply());
-            history.setExecutionStatus(status);
-            commandHistoryRepository.save(history);
-        }
+        CommandHistory history = new CommandHistory();
+        history.setUser(user);
+        history.setRawText(rawText);
+        history.setDetectedIntent(response.getIntent());
+        history.setAssistantReply(response.getReply());
+        history.setExecutionStatus(status);
+        commandHistoryRepository.save(history);
     }
 }

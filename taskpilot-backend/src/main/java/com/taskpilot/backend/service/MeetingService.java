@@ -30,6 +30,10 @@ public class MeetingService {
         UsageResponse usage = featureAccessService.checkAndConsumeUsage(user,
                 FeatureAccessService.Feature.MEETING_SCHEDULE);
 
+        if (meeting.getMeetingTime() != null && meeting.getMeetingTime().isBefore(java.time.Instant.now())) {
+            throw new RuntimeException("Meeting time must be in the future");
+        }
+
         meeting.setUser(user);
         Meeting saved = meetingRepository.save(meeting);
         return new FeatureResponse<>(saved, usage);

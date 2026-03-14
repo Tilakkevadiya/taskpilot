@@ -2,7 +2,7 @@ package com.taskpilot.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @Entity
@@ -19,9 +19,15 @@ public class Meeting {
     @Column(nullable = false)
     private String title;
 
-    private LocalDateTime meetingTime;
+    private Instant meetingTime;
 
     private String participants; // Comma separated list of emails
 
     private String location;
+    private String type;
+    private Integer duration;
+    private String description;
+
+    private Integer reminderMinutesBefore;
+    private boolean reminderSent = false;
 }

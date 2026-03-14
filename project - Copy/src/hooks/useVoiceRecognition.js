@@ -1,106 +1,79 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
+/**
+ * Custom hook for Web Speech Recognition
+ * @param {Function} onResult - Called with final transcript string
+ * @param {Function} onError  - Called with error code string
+ */
 const useVoiceRecognition = (onResult, onError) => {
   const [isListening, setIsListening] = useState(false)
-  const [transcript, setTranscript] = useState('')
   const recognitionRef = useRef(null)
 
+  const onResultRef = useRef(onResult)
+  const onErrorRef  = useRef(onError)
+  useEffect(() => { onResultRef.current = onResult }, [onResult])
+  useEffect(() => { onErrorRef.current  = onError  }, [onError])
+
+  const isSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+
   useEffect(() => {
-    // Check if browser supports Speech Recognition
+    if (!isSupported) return
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    
-    if (!SpeechRecognition) {
-      console.warn('Speech Recognition not supported in this browser')
-      return
-    }
-
     const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
 
-    recognition.onstart = () => {
-      setIsListening(true)
-    }
+    recognition.continuous      = false   // stop after one sentence
+    recognition.interimResults  = true
+    recognition.lang            = 'en-US'
+
+    recognition.onstart  = () => setIsListening(true)
+    recognition.onend    = () => setIsListening(false)
 
     recognition.onresult = (event) => {
-      let interimTranscript = ''
       let finalTranscript = ''
-
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' '
-        } else {
-          interimTranscript += transcript
+          finalTranscript += event.results[i][0].transcript
         }
       }
-
-      setTranscript(finalTranscript || interimTranscript)
-
-      if (finalTranscript) {
-        onResult(finalTranscript.trim())
+      if (finalTranscript.trim()) {
+        onResultRef.current(finalTranscript.trim())
       }
     }
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error)
+      console.error('Voice recognition error:', event.error)
       setIsListening(false)
-      if (onError) {
-        onError(event.error)
+      if (event.error !== 'no-speech') {
+        onErrorRef.current?.(event.error)
       }
-    }
-
-    recognition.onend = () => {
-      setIsListening(false)
     }
 
     recognitionRef.current = recognition
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
-      }
+      recognition.abort()
     }
-  }, [onResult, onError])
+  }, [isSupported])
 
-  const startListening = () => {
+  const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start()
-      } catch (error) {
-        console.error('Error starting recognition:', error)
-      }
+      try { recognitionRef.current.start() }
+      catch (err) { console.warn('Recognition start error:', err) }
     }
-  }
+  }, [isListening])
 
-  const stopListening = () => {
+  const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop()
-      setIsListening(false)
     }
-  }
+  }, [isListening])
 
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening()
-    } else {
-      startListening()
-    }
-  }
+  const toggleListening = useCallback(() => {
+    isListening ? stopListening() : startListening()
+  }, [isListening, startListening, stopListening])
 
-  return {
-    isListening,
-    transcript,
-    startListening,
-    stopListening,
-    toggleListening,
-    isSupported: !!window.SpeechRecognition || !!window.webkitSpeechRecognition
-  }
+  return { isListening, startListening, stopListening, toggleListening, isSupported }
 }
 
 export default useVoiceRecognition
-
-
-
-

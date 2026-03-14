@@ -13,4 +13,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
     List<Meeting> findByUser(User user);
 
     List<Meeting> findByUserAndMeetingTimeAfterOrderByMeetingTimeAsc(User user, LocalDateTime time);
+
+    List<Meeting> findByReminderSentFalseAndReminderMinutesBeforeIsNotNull();
 }
