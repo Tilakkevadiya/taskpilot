@@ -15,7 +15,7 @@ import { useUsage } from '../../context/UsageContext';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 
-import './assistant.css';
+import './Assistant.css';
 
 const HISTORY_KEY = 'taskpilot_chat_history';
 
