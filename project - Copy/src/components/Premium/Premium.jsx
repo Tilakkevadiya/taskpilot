@@ -59,7 +59,7 @@ const Premium = ({ isOpen, onClose }) => {
     try {
       const token = localStorage.getItem('token')
       const orderRes = await axios.post(
-        'http://localhost:8080/api/payment/create-order',
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/payment/create-order`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )
@@ -83,7 +83,7 @@ const Premium = ({ isOpen, onClose }) => {
           setStep('verifying')
           try {
             await axios.post(
-              'http://localhost:8080/api/payment/verify',
+              `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/payment/verify`,
               {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
@@ -93,7 +93,7 @@ const Premium = ({ isOpen, onClose }) => {
             )
 
             const refreshRes = await axios.post(
-              'http://localhost:8080/api/payment/refresh-token',
+              `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/payment/refresh-token`,
               {},
               { headers: { Authorization: `Bearer ${token}` } }
             )
